@@ -1,0 +1,9 @@
+checkpoint/
+.venv/
+__pycache__/
+*.xlsx
+*.csv
+!data/TEC22_Data.csv
+*.log
+.idea/
+.vscode/
