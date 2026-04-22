@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from keras import Sequential
 from keras.src.callbacks import ModelCheckpoint, EarlyStopping
 from keras.src.layers import LSTM, Dense
@@ -10,6 +11,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn import datasets, linear_model, metrics, model_selection, __all__, ensemble
 from catboost import CatBoostRegressor
 from sklearn.metrics import mean_absolute_error
+
+tf.random.set_seed(42)
 
 data = pd.read_csv(r'C:\Users\guryanov\PycharmProjects\TEC_Qpred\data\TEC22_Data.csv', delimiter=';', parse_dates=['Date'], dayfirst=True)
 
@@ -24,7 +27,6 @@ x = data.loc[:, ['T', 'Year', 'Month_sin', 'Month_cos']]
 x = x.values
 y = data.loc[:, ['TEC_Q_Aver']]
 y = y.values
-print(y)
 
 n=3258
 
@@ -32,13 +34,6 @@ X_train = x[:n]
 X_test = x[n: ]
 y_train = y[:n]
 y_test = y[n: ]
-
-def create_windows(x_data, y_data, window_size=14):
-    X, y = [], []
-    for i in range(len(x_data) - window_size):
-        X.append(x_data[i : i + window_size])
-        y.append(y_data[i + window_size])
-    return np.array(X), np.array(y)
 
 scaler = MinMaxScaler()
 scaler.fit(X_train)
@@ -48,38 +43,24 @@ X_test_scaled = scaler.transform(X_test)
 scaler_y = MinMaxScaler()
 y_train_scaled = scaler_y.fit_transform(y_train)
 y_test_scaled = scaler_y.transform(y_test)
-'''
-window_size = 7
-X_train_win, y_train_win = create_windows(X_train_scaled, y_train_scaled, window_size)
-X_test_win, y_test_win = create_windows(X_test_scaled, y_test_scaled, window_size)
-
-X_train_flat = X_train_win.reshape(X_train_win.shape[0], -1)
-X_test_flat = X_test_win.reshape(X_test_win.shape[0], -1)
-'''
-
-X_train_flat = X_train_scaled
-X_test_flat = X_test_scaled
-y_train_win = y_train_scaled
-y_test_win = y_test_scaled
-print(X_train_flat[:5])
-print(y_train_win[:5])
-
 
 model = CatBoostRegressor(iterations=2000,
                           depth=6,
                           learning_rate=0.05,
                           loss_function='MAE',
-                          verbose=0)
+                          verbose=2,
+                          random_seed=42,
+                          use_best_model=True)
 
-model.fit(X_train_flat, y_train_win, eval_set=(X_test_flat, y_test_win), early_stopping_rounds=50)
+model.fit(X_train_scaled, y_train_scaled, eval_set=(X_test_scaled, y_test_scaled), early_stopping_rounds=50)
 
 params = model.get_all_params()
 print(params.get('random_seed'))
 
-y_test_pred = model.predict(X_test_flat).reshape(-1, 1)
+y_test_pred = model.predict(X_test_scaled).reshape(-1, 1)
 print(y_test_pred)
 yhat = scaler_y.inverse_transform(y_test_pred)
-y_test_actual = scaler_y.inverse_transform(y_test_win)
+y_test_actual = scaler_y.inverse_transform(y_test_scaled)
 
 # plot history
 '''plt.plot(history.history['loss'], label='train')

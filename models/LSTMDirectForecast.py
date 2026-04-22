@@ -70,16 +70,13 @@ def train_lstm_direct_multistep(data, n_out=14, train_size=3258):
         model = build_model((X_train_scaled.shape[1], X_train_scaled.shape[2]))
 
         current_checkpoint = checkpoint_base + str(i) + '.keras'
-        checkpoint_callback = ModelCheckpoint(filepath=current_checkpoint, save_best_only=True, monitor='val_loss')
-        early_stop_callback = EarlyStopping(monitor='val_loss', patience=500, verbose=1, restore_best_weights=True,
-                                            min_delta=0.0001)
+
         if os.path.exists(current_checkpoint):
             print(f"Step {i + 1}: File found. Upload the finished model.... ---")
             from keras.models import load_model
             model = load_model(current_checkpoint)
         else:
             print(f"--- Step {i + 1}: File not found. Starting training... ---")
-
             if i > 0:
                 prev_model_path = checkpoint_base + str(i - 1) + '.keras'
                 if os.path.exists(prev_model_path):

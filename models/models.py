@@ -6,11 +6,13 @@ from sklearn.linear_model import LinearRegression
 
 def get_catboost():
     return CatBoostRegressor(
-        iterations=5000,
+        iterations=2000,
         depth=6,
         learning_rate=0.05,
         loss_function='MAE',
-        verbose=0
+        verbose=0,
+        random_seed=42,
+        use_best_model=True,
     )
 
 def get_lstm(input_shape):

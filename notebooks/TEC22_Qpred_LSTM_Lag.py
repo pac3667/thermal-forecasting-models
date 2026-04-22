@@ -56,7 +56,6 @@ for i in range(0, n_out, 1):
     y_train, y_test = y[:3258], y[3258:]
 
     scaler = MinMaxScaler()
-    #scaler = RobustScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
@@ -64,7 +63,6 @@ for i in range(0, n_out, 1):
     X_test_scaled = X_test_scaled.reshape((X_test_scaled.shape[0], 1, X_test_scaled.shape[1]))
 
     scaler_y = MinMaxScaler()
-    #scaler_y = RobustScaler()
     y_train_scaled = scaler_y.fit_transform(y_train)
     y_test_scaled = scaler_y.transform(y_test)
 

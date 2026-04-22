@@ -27,7 +27,7 @@ def prepare_data(filepath):
     X_train_s = scaler_x.fit_transform(X_train)
     X_test_s = scaler_x.transform(X_test)
     y_train_s = scaler_y.fit_transform(y_train)
-    y_test_s = scaler_y.fit_transform(y_test)
+    y_test_s = scaler_y.transform(y_test)
     return X_train_s, X_test_s, y_train_s, y_test_s, y_train, y_test, scaler_y, data.index
 
 def create_windows(x_data, y_data, window_size=14):

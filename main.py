@@ -1,17 +1,20 @@
+import os
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from keras import metrics
-from keras.src.saving import load_model
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn import metrics
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.models import load_model
 
 from models.CBRDirectForecast import train_cbr_direct_multistep
-from utils import prepare_data, create_windows
-from models.models import get_catboost, get_lstm, get_linear, get_simple_mlp, get_rfr, get_mlp
 from models.LSTMDirectForecast import train_lstm_direct_multistep
-from sklearn import metrics
-import os
+from models.models import (
+    get_catboost, get_linear, get_lstm,
+    get_mlp, get_rfr, get_simple_mlp
+)
+from utils import create_windows, prepare_data
 
 tf.random.set_seed(42)
 
@@ -70,7 +73,7 @@ def main():
     results['Boosting'] = scaler_y.inverse_transform(y_test_pred)
 
     # ---  simple MLP ---
-    model_mlp = get_simple_mlp((X_train_s.shape[1],))
+    model_smlp = get_simple_mlp((X_train_s.shape[1],))
     early_stop_callback = EarlyStopping(monitor='val_loss', patience=250, verbose=1, restore_best_weights=True,
                                         min_delta=0.0001)
 
@@ -79,10 +82,10 @@ def main():
                                                 monitor='val_loss', mode='min', save_best_only=True, verbose=1)
     if os.path.exists(checkpoint_filepath):
         print("Load Model...")
-        model = load_model(checkpoint_filepath)
+        model_smlp = load_model(checkpoint_filepath)
     else:
         print("Checkpoint not found, starting training...")
-        model_mlp.fit(X_train_s ,
+        model_smlp.fit(X_train_s ,
                     y_train_s,
                     epochs=1000,
                     batch_size=30,
@@ -91,7 +94,7 @@ def main():
                     callbacks=[early_stop_callback,model_checkpoint_callback],
                     verbose="auto",
                     shuffle=False)
-    y_test_pred_scaled = model_mlp.predict(X_test_s)
+    y_test_pred_scaled = model_smlp.predict(X_test_s)
     results['simple_MLP'] = scaler_y.inverse_transform(y_test_pred_scaled)
 
     # ---  MLP ---
@@ -104,12 +107,12 @@ def main():
                                                 monitor='val_loss', mode='min', save_best_only=True, verbose=1)
     if os.path.exists(checkpoint_filepath):
         print("Load Model...")
-        model = load_model(checkpoint_filepath)
+        model_mlp = load_model(checkpoint_filepath)
     else:
         print("Checkpoint not found, starting training...")
         model_mlp.fit(X_train_s ,
                     y_train_s,
-                    epochs=2500,
+                    epochs=1000,
                     batch_size=30,
                     validation_data=(X_test_s, y_test_s),
                     validation_batch_size=30,

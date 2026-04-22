@@ -11,16 +11,13 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 from sklearn import datasets, linear_model, metrics, model_selection, __all__, ensemble
 import seaborn as sns
 
-data = pd.read_csv(r'C:\Users\Andrey\PyCharmMiscProject\data\TEC22_Data.csv', delimiter=';', parse_dates=['Date'], dayfirst=True)
+data = pd.read_csv(r'C:\Users\guryanov\PycharmProjects\TEC_Qpred\data\TEC22_Data.csv', delimiter=';', parse_dates=['Date'], dayfirst=True)
 data['Month'] = data['Date'].dt.month
 data['Year'] = data['Date'].dt.year
 data['Month_sin'] = np.sin(2 * np.pi * data['Month'] / 12)
 data['Month_cos'] = np.cos(2 * np.pi * data['Month'] / 12)
 data['Q_rolling_3'] = data['TEC_Q_Aver'].rolling(window=3).mean()
 data.set_index('Date', inplace=True)
-
-plt.tight_layout()
-plt.show()
 
 n_out = 14
 
@@ -37,18 +34,8 @@ for i in range(1, n_out + 1):
 agg = concat(cols, axis=1)
 agg.columns = names
 agg.dropna(inplace=True)
-
 data_with_lag = pd.concat([data, agg], axis=1)
 data_with_lag.dropna(inplace=True)
-def build_model(input_shape):
-    model = Sequential()
-    model.add(LSTM(100, input_shape=input_shape))
-    model.add(Dense(50, activation='relu'))
-    model.add(Dense(1))
-    model.compile(loss='mae', optimizer='adam', metrics=['mse', 'mape', 'r2_score'])
-    return model
-
-checkpoint_base = r'C:\Users\Andrey\PyCharmMiscProject\checkpoint\LSTM_LAG_model_step_'
 
 metrics_list = []
 results_list = np.array(())
@@ -61,19 +48,12 @@ for i in range(0, n_out, 1):
     y_train, y_test = y[:3258], y[3258:]
 
     scaler = MinMaxScaler()
-    #scaler = RobustScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
     scaler_y = MinMaxScaler()
-    #scaler_y = RobustScaler()
     y_train_scaled = scaler_y.fit_transform(y_train)
     y_test_scaled = scaler_y.transform(y_test)
-
-    X_train_flat = X_train_scaled
-    X_test_flat = X_test_scaled
-    y_train_win = y_train_scaled
-    y_test_win = y_test_scaled
 
     model = CatBoostRegressor(iterations=2000,
                               depth=6,
@@ -81,11 +61,11 @@ for i in range(0, n_out, 1):
                               loss_function='MAE',
                               verbose=0)
 
-    model.fit(X_train_flat, y_train_win, eval_set=(X_test_flat, y_test_win), early_stopping_rounds=50)
+    model.fit(X_train_scaled, y_train_scaled, eval_set=(X_test_scaled, y_test_scaled), early_stopping_rounds=50)
 
-    y_test_pred = model.predict(X_test_flat).reshape(-1, 1)
+    y_test_pred = model.predict(X_test_scaled).reshape(-1, 1)
     yhat = scaler_y.inverse_transform(y_test_pred)
-    y_test_actual = scaler_y.inverse_transform(y_test_win)
+    y_test_actual = scaler_y.inverse_transform(y_test_scaled)
 
     MAE_test = metrics.mean_absolute_error(y_test, yhat)
     MSE_test = metrics.mean_squared_error(y_test, yhat)
