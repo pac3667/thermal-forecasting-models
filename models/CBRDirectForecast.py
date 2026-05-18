@@ -7,9 +7,9 @@ from pandas import concat
 from sklearn.preprocessing import MinMaxScaler
 
 
-def train_cbr_direct_multistep(data, n_out=14, train_size=3258):
+def train_cbr_direct_multistep(data, n_out, train_size):
     results_list = []
-    MAE_list = []
+    metrics_list = []
     data = pd.read_csv(data, delimiter=';', parse_dates=['Date'], dayfirst=True)
     data['Month'] = data['Date'].dt.month
     data['Year'] = data['Date'].dt.year
@@ -63,10 +63,10 @@ def train_cbr_direct_multistep(data, n_out=14, train_size=3258):
 
         MAE_test = metrics.mean_absolute_error(y_test, yhat)
         MSE_test = metrics.mean_squared_error(y_test, yhat)
-        MAPE_test = metrics.mean_absolute_percentage_error(y_test, yhat)
+        MAPE_test = metrics.mean_absolute_percentage_error(y_test, yhat)*100
         R2_test = metrics.r2_score(y_test, yhat)
 
         results_list.append(yhat)
-        MAE_list.append(MAE_test)
-    return np.hstack(MAE_list)
+        metrics_list.append([MAE_test,MSE_test,MAPE_test,R2_test])
+    return np.hstack(metrics_list)
 

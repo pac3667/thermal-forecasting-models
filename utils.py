@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
 
-def prepare_data(filepath):
+def prepare_data(filepath, test_start_index):
     data = pd.read_csv(filepath, delimiter=';', parse_dates=['Date'], dayfirst=True)
 
     data['Month'] = data['Date'].dt.month
@@ -16,7 +16,7 @@ def prepare_data(filepath):
     X = data[['T', 'Year', 'Month_sin', 'Month_cos']].values
     y = data[['TEC_Q_Aver']].values
 
-    n = 3258
+    n = test_start_index
     X_train, X_test = X[:n], X[n:]
     y_train, y_test = y[:n], y[n:]
 

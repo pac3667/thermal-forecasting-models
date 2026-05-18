@@ -10,12 +10,12 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn import metrics
 
 
-def train_lstm_direct_multistep(data, n_out=14, train_size=3258):
+def train_lstm_direct_multistep(data, checkpoint_dir, n_out, train_size):
     results_list = []
-    MAE_list = []
-    checkpoint_dir = 'checkpoint/multistep'
+    metrics_list = []
+    checkpoint_dir = checkpoint_dir + 'multistep'
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_base = 'checkpoint/multistep/Qpred_LSTM_LAG_model_step_'
+    checkpoint_base = checkpoint_dir + '/Qpred_LSTM_LAG_model_step_'
     data = pd.read_csv(data, delimiter=';', parse_dates=['Date'], dayfirst=True)
     data['Month'] = data['Date'].dt.month
     data['Year'] = data['Date'].dt.year
@@ -72,35 +72,38 @@ def train_lstm_direct_multistep(data, n_out=14, train_size=3258):
         current_checkpoint = checkpoint_base + str(i) + '.keras'
 
         if os.path.exists(current_checkpoint):
-            print(f"Step {i + 1}: File found. Upload the finished model.... ---")
+            print(f"--- Step {i + 1}: File found. Loading and RESUMING training... ---")
             from keras.models import load_model
             model = load_model(current_checkpoint)
+            model.optimizer.learning_rate.assign(1e-4)
+            current_epochs = 50
         else:
-            print(f"--- Step {i + 1}: File not found. Starting training... ---")
+            print(f"--- Step {i + 1}: File not found. Starting NEW training... ---")
+            current_epochs = 1000
+
             if i > 0:
                 prev_model_path = checkpoint_base + str(i - 1) + '.keras'
                 if os.path.exists(prev_model_path):
                     model.load_weights(prev_model_path)
-                    print(f"The weights are initialized from step {i}")
+                    print(f"Weights initialized from step {i}")
 
-            checkpoint_callback = ModelCheckpoint(filepath=current_checkpoint, save_best_only=True, monitor='val_loss')
-            early_stop_callback = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
+        checkpoint_callback = ModelCheckpoint(filepath=current_checkpoint, save_best_only=True, monitor='val_loss')
+        early_stop_callback = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
-            model.fit(X_train_scaled, y_train_scaled,
-                      epochs=1500,
-                      batch_size=32,
-                      validation_data=(X_test_scaled, y_test_scaled),
-                      callbacks=[early_stop_callback, checkpoint_callback],
-                      verbose=2,
-                      shuffle=False)
+        model.fit(X_train_scaled, y_train_scaled,
+                  epochs=current_epochs,
+                  batch_size=32,
+                  validation_data=(X_test_scaled, y_test_scaled),
+                  callbacks=[early_stop_callback, checkpoint_callback],
+                  verbose=2,
+                  shuffle=False)
 
         yhat_scaled = model.predict(X_test_scaled)
         yhat = scaler_y.inverse_transform(yhat_scaled)
         MAE_test = metrics.mean_absolute_error(y_test, yhat)
         MSE_test = metrics.mean_squared_error(y_test, yhat)
-        MAPE_test = metrics.mean_absolute_percentage_error(y_test, yhat)
+        MAPE_test = metrics.mean_absolute_percentage_error(y_test, yhat)*100
         R2_test = metrics.r2_score(y_test, yhat)
         results_list.append(yhat)
-        MAE_list.append(MAE_test)
-
-    return np.hstack(MAE_list)
+        metrics_list.append([MAE_test,MSE_test,MAPE_test,R2_test])
+    return np.hstack(metrics_list)

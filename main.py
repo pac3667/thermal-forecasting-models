@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import argparse
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn import metrics
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -19,15 +20,29 @@ from utils import create_windows, prepare_data
 tf.random.set_seed(42)
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--file', type=str, default='data/TEC14_Data.csv', help='Путь к файлу данных') #data/TEC22_Data.csv data/TEC14_Data.csv
+    parser.add_argument('--start', type=int, default=2840, help='Индекс начала тестовых данных')     #3258 2840
+    parser.add_argument('--forecast_window', type=int, default=14, help='окно прогноза')
+    args = parser.parse_args()
+
+    data_path = args.file
+    test_start_index = args.start
+    n_out = args.forecast_window
+
+    model_name = os.path.basename(data_path).split('.')[0]
+    checkpoint_dir = f'checkpoint/{model_name}/'
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
     # 1. Prepare Data
-    X_train_s, X_test_s, y_train_s, y_test_s, y_train, y_test, scaler_y, dates = prepare_data('data/TEC22_Data.csv')
-    os.makedirs('checkpoint/multistep', exist_ok=True)
+    X_train_s, X_test_s, y_train_s, y_test_s, y_train, y_test, scaler_y, dates = prepare_data(data_path, test_start_index=test_start_index)
+    os.makedirs(checkpoint_dir+'multistep', exist_ok=True)
     results = {}
     # ---  LSTM ---
     X_train_lstm = X_train_s.reshape((X_train_s.shape[0], 1, X_train_s.shape[1]))
     X_test_lstm = X_test_s.reshape((X_test_s.shape[0], 1, X_test_s.shape[1]))
 
-    checkpoint_filepath = 'checkpoint/Qpred_LSTM.keras'
+    checkpoint_filepath = checkpoint_dir+'Qpred_LSTM.keras'
     model_checkpoint_callback = ModelCheckpoint(filepath=checkpoint_filepath, save_weights_only=False,
                                                 monitor='val_loss', mode='min', save_best_only=True, verbose=1)
 
@@ -35,19 +50,25 @@ def main():
                                         min_delta=0.0001)
 
     model_lstm = get_lstm((1, X_train_s.shape[1]))
+
     if os.path.exists(checkpoint_filepath):
-        print("Load Model...")
+        print("Loading model for further training...")
         model_lstm = load_model(checkpoint_filepath)
+        model_lstm.optimizer.learning_rate.assign(1e-4)
+        current_epochs = 50
     else:
         print("Checkpoint not found, starting training...")
-        model_lstm.fit(X_train_lstm, y_train_s,
-                    epochs=1000,
-                    batch_size=30,
-                    validation_data=(X_test_lstm, y_test_s),
-                    validation_batch_size=30,
-                    callbacks=[early_stop_callback,model_checkpoint_callback],
-                    verbose="auto",
-                    shuffle=False)
+        current_epochs = 1000
+
+    model_lstm.fit(
+        X_train_lstm, y_train_s,
+        epochs=current_epochs,
+        batch_size=30,
+        validation_data=(X_test_lstm, y_test_s),
+        callbacks=[early_stop_callback, model_checkpoint_callback],
+        verbose="auto",
+        shuffle=False
+    )
 
     pred_lstm_s = model_lstm.predict(X_test_lstm)
     results['LSTM'] = scaler_y.inverse_transform(pred_lstm_s)
@@ -77,23 +98,27 @@ def main():
     early_stop_callback = EarlyStopping(monitor='val_loss', patience=250, verbose=1, restore_best_weights=True,
                                         min_delta=0.0001)
 
-    checkpoint_filepath = 'checkpoint/Qpred_sMLP.keras'
+    checkpoint_filepath = checkpoint_dir+'Qpred_sMLP.keras'
     model_checkpoint_callback = ModelCheckpoint(filepath=checkpoint_filepath, save_weights_only=False,
                                                 monitor='val_loss', mode='min', save_best_only=True, verbose=1)
     if os.path.exists(checkpoint_filepath):
-        print("Load Model...")
+        print("Loading model for further training...")
         model_smlp = load_model(checkpoint_filepath)
+        model_smlp.optimizer.learning_rate.assign(1e-4)
+        current_epochs = 50
     else:
         print("Checkpoint not found, starting training...")
-        model_smlp.fit(X_train_s ,
-                    y_train_s,
-                    epochs=1000,
-                    batch_size=30,
-                    validation_data=(X_test_s, y_test_s),
-                    validation_batch_size=30,
-                    callbacks=[early_stop_callback,model_checkpoint_callback],
-                    verbose="auto",
-                    shuffle=False)
+        current_epochs = 1000
+
+    model_smlp.fit(X_train_s ,
+                y_train_s,
+                epochs=current_epochs,
+                batch_size=30,
+                validation_data=(X_test_s, y_test_s),
+                validation_batch_size=30,
+                callbacks=[early_stop_callback,model_checkpoint_callback],
+                verbose="auto",
+                shuffle=False)
     y_test_pred_scaled = model_smlp.predict(X_test_s)
     results['simple_MLP'] = scaler_y.inverse_transform(y_test_pred_scaled)
 
@@ -102,23 +127,27 @@ def main():
     early_stop_callback = EarlyStopping(monitor='val_loss', patience=250, verbose=1, restore_best_weights=True,
                                         min_delta=0.0001)
 
-    checkpoint_filepath = 'checkpoint/Qpred_MLP.keras'
+    checkpoint_filepath = checkpoint_dir+'Qpred_MLP.keras'
     model_checkpoint_callback = ModelCheckpoint(filepath=checkpoint_filepath, save_weights_only=False,
                                                 monitor='val_loss', mode='min', save_best_only=True, verbose=1)
     if os.path.exists(checkpoint_filepath):
-        print("Load Model...")
+        print("Loading model for further training...")
         model_mlp = load_model(checkpoint_filepath)
+        model_mlp.optimizer.learning_rate.assign(1e-4)
+        current_epochs = 50
     else:
         print("Checkpoint not found, starting training...")
-        model_mlp.fit(X_train_s ,
-                    y_train_s,
-                    epochs=1000,
-                    batch_size=30,
-                    validation_data=(X_test_s, y_test_s),
-                    validation_batch_size=30,
-                    callbacks=[early_stop_callback,model_checkpoint_callback],
-                    verbose="auto",
-                    shuffle=False)
+        current_epochs = 1000
+
+    model_mlp.fit(X_train_s ,
+                y_train_s,
+                epochs=current_epochs,
+                batch_size=30,
+                validation_data=(X_test_s, y_test_s),
+                validation_batch_size=30,
+                callbacks=[early_stop_callback,model_checkpoint_callback],
+                verbose="auto",
+                shuffle=False)
 
     y_test_pred_scaled = model_mlp.predict(X_test_s)
     results['MLP'] = scaler_y.inverse_transform(y_test_pred_scaled)
@@ -147,7 +176,7 @@ def main():
     X_train_win, y_train_win = create_windows(X_train_s, y_train_s, window_size)
     X_test_win, y_test_win = create_windows(X_test_s, y_test_s, window_size)
 
-    checkpoint_filepath = 'checkpoint/Qpred_LSTM_with_RW.keras'
+    checkpoint_filepath = checkpoint_dir+'Qpred_LSTM_with_RW.keras'
     model_checkpoint_callback = ModelCheckpoint(filepath=checkpoint_filepath, save_weights_only=False,
                                                 monitor='val_loss', mode='min', save_best_only=True, verbose=1)
 
@@ -155,28 +184,33 @@ def main():
                                         min_delta=0.0001)
 
     model_lstmrw = get_lstm((window_size, X_train_s.shape[1]))
+
     if os.path.exists(checkpoint_filepath):
-        print("Load Model...")
+        print("Loading model for further training...")
         model_lstmrw = load_model(checkpoint_filepath)
+        model_lstmrw.optimizer.learning_rate.assign(1e-4)
+        current_epochs = 50
     else:
         print("Checkpoint not found, starting training...")
-        model_lstmrw.fit(X_train_win, y_train_win,
-                    epochs=1000,
-                    batch_size=30,
-                    validation_data=(X_test_win, y_test_win),
-                    validation_batch_size=30,
-                    callbacks=[early_stop_callback,model_checkpoint_callback],
-                    verbose="auto",
-                    shuffle=False)
+        current_epochs = 1000
+    model_lstmrw.fit(X_train_win, y_train_win,
+                epochs=current_epochs,
+                batch_size=30,
+                validation_data=(X_test_win, y_test_win),
+                validation_batch_size=30,
+                callbacks=[early_stop_callback,model_checkpoint_callback],
+                verbose="auto",
+                shuffle=False)
 
     pred_lstm_s = model_lstmrw.predict(X_test_win)
     results['LSTM_with_Window'] = scaler_y.inverse_transform(pred_lstm_s)
 
     # ---  LSTM with window direct forecast---
-    lstm_multi_results = train_lstm_direct_multistep('data/TEC22_Data.csv', n_out=14)
-
+    lstm_multi_results = train_lstm_direct_multistep(data_path, checkpoint_dir, n_out, test_start_index)
+    lstm_multi_results = np.array(lstm_multi_results).reshape(-1, 4)
     # --- Boosting with window direct forecast---
-    cbr_multi_results = train_cbr_direct_multistep('data/TEC22_Data.csv', n_out=14)
+    cbr_multi_results = train_cbr_direct_multistep(data_path, n_out, test_start_index)
+    cbr_multi_results = np.array(cbr_multi_results).reshape(-1, 4)
 
     # 3. Model Evaluation & Comparison
     print("\n" + "=" * 50)
@@ -222,10 +256,10 @@ def main():
     print("\n" + "=" * 60)
     print("HORIZON ANALYSIS (LSTM vs CBR)")
     print("-" * 60)
-    print(f"{'Day':<5} | {'LSTM MAE':<12} | {'CBR MAE':<12}")
+    print(f"{'Day':<5} | {'LSTM MAE':<12} | {'LSTM MSE':<12} | {'LSTM MAPE':<12} | {'LSTM R2':<12} | {'CBR MAE':<12} | {'CBR MSE':<12} | {'CBR MAPE':<12} | {'CBR R2':<12}")
 
     for i in range(lstm_multi_results.shape[0]):
-        print(f"{i + 1:<5} | {lstm_multi_results[i]:<12.4f} | {cbr_multi_results[i]:<12.4f}")
+        print(f"{i + 1:<5} | {lstm_multi_results[i][0]:<12.4f} | {lstm_multi_results[i][1]:<12.4f} | {lstm_multi_results[i][2]:<12.4f} | {lstm_multi_results[i][3]:<12.4f} | {cbr_multi_results[i][0]:<12.4f} | {cbr_multi_results[i][1]:<12.4f} | {cbr_multi_results[i][2]:<12.4f} | {cbr_multi_results[i][3]:<12.4f}")
 
 if __name__ == "__main__":
     main()
