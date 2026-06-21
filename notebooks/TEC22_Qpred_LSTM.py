@@ -68,7 +68,7 @@ model.compile(optimizer='adam', loss='mae', metrics=['mse'])
 history_LSTM = model.fit(X_train_scaled,
                     y_train_scaled,
                     epochs=1000,
-                    batch_size=30,
+                    batch_size=4096,
                     validation_data=(X_test_scaled, y_test_scaled),
                     validation_batch_size=30,
                     callbacks=[early_stop_callback,model_checkpoint_callback],
